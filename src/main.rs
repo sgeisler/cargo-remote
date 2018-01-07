@@ -10,10 +10,9 @@ extern crate simple_logger;
 extern crate toml;
 
 use std::process::{exit, Command, Stdio};
-use std::ffi::OsString;
 use std::path::Path;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::Read;
 
 use structopt::StructOpt;
 
@@ -58,11 +57,13 @@ fn main() {
         )
     });
 
+    // TODO: refactor argument and config parsing and merging
     let build_server = options.remote.unwrap_or_else(|| {
         let config_path = project_dir.join(".cargo-remote.toml");
         File::open(config_path).ok().and_then(|mut file| {
             let mut config_file_string = "".to_owned();
-            file.read_to_string(&mut config_file_string);
+            // ignore the result for now, the whole config/argument parsing needs to be refactored
+            let _ = file.read_to_string(&mut config_file_string);
             config_file_string.parse::<Value>().ok()
         }).and_then(|value| {
             value["remote"].as_str().map(str::to_owned)
