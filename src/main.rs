@@ -44,6 +44,13 @@ struct Opts {
         parse(from_os_str)
     )]
     manifest_path: Option<PathBuf>,
+
+    #[structopt(
+    short = "h",
+    long = "transfer-hidden",
+    help = "transfer hidden files and directories to the build server"
+    )]
+    hidden: bool
 }
 
 fn main() {
@@ -89,13 +96,19 @@ fn main() {
 
     info!("Transferring sources to build server.");
     // transfer project to build server
-    Command::new("rsync")
-        .arg("-a")
+    let mut rsync_to = Command::new("rsync");
+    rsync_to.arg("-a".to_owned())
         .arg("--delete")
         .arg("--info=progress2")
         .arg("--exclude")
-        .arg("target")
-        .arg("--rsync-path")
+        .arg("target");
+
+    if !options.hidden {
+        rsync_to.arg("--exclude")
+            .arg(".*");
+    }
+
+    rsync_to.arg("--rsync-path")
         .arg("mkdir -p remote-builds && rsync")
         .arg(format!("{}/", project_dir.to_string_lossy()))
         .arg(format!("{}:~/remote-builds/{}/", build_server, project_name))
