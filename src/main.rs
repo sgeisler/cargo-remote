@@ -7,27 +7,26 @@ extern crate cargo_metadata;
 #[macro_use] extern crate log;
 extern crate simple_logger;
 
+extern crate toml;
+
 use std::process::{exit, Command, Stdio};
 use std::ffi::OsString;
 use std::path::Path;
+use std::fs::File;
+use std::io::{BufReader, Read};
 
 use structopt::StructOpt;
+
+use toml::Value;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "cargo remote")]
 struct Opts {
     // workaround for "remote" argument when calling "cargo remote"
     _unused: String,
-    #[structopt(subcommand)]
-    command: Cmd,
+    command: String,
     #[structopt(short = "r", long = "remote", help = "remote ssh build server")]
-    remote: String
-}
-
-#[derive(StructOpt, Debug)]
-enum Cmd {
-    #[structopt(name="build", help = "Build cargo project remotely and copy back target folder")]
-    Build,
+    remote: Option<String>
 }
 
 fn main() {
@@ -46,12 +45,26 @@ fn main() {
         exit(-2);
     }, |project| {
         (
-            Path::new(&project.manifest_path).parent().expect("Cargo.toml seems to have no parent directory?"),
+            Path::new(&project.manifest_path)
+                .parent()
+                .expect("Cargo.toml seems to have no parent directory?"),
             &project.name
         )
     });
 
-    let build_server = options.remote;
+    let build_server = options.remote.unwrap_or_else(|| {
+        let config_path = project_dir.join(".cargo-remote.toml");
+        File::open(config_path).ok().and_then(|mut file| {
+            let mut config_file_string = "".to_owned();
+            file.read_to_string(&mut config_file_string);
+            config_file_string.parse::<Value>().ok()
+        }).and_then(|value| {
+            value["remote"].as_str().map(str::to_owned)
+        }).unwrap_or_else(|| {
+            error!("No remote build server was defined (use config file or --remote flag)");
+            exit(-3);
+        })
+    });
 
     match options.command {
         Build => {
