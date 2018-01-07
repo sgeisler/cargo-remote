@@ -10,9 +10,10 @@ extern crate simple_logger;
 extern crate toml;
 
 use std::process::{exit, Command, Stdio};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::Read;
+use std::borrow::Borrow;
 
 use structopt::StructOpt;
 
@@ -30,16 +31,29 @@ struct Opts {
     #[structopt(short = "r", long = "remote", help = "remote ssh build server")]
     remote: Option<String>,
 
-    #[structopt(short = "c", long = "copy-back", help = "transfer the target folder back to the local machine")]
-    copy_back: bool
+    #[structopt(
+        short = "c",
+        long = "copy-back",
+        help = "transfer the target folder back to the local machine"
+    )]
+    copy_back: bool,
+
+    #[structopt(
+        long = "manifest-path",
+        help = "Path to the manifest to execute",
+        parse(from_os_str)
+    )]
+    manifest_path: Option<PathBuf>,
 }
 
 fn main() {
     simple_logger::init().unwrap();
 
     let options = Opts::from_args();
-    // TODO: add manifest_path option
-    let project_metadata = cargo_metadata::metadata(None).unwrap_or_else(|e| {
+
+    let manifest_path = options.manifest_path.as_ref().map(PathBuf::borrow);
+    let project_metadata = cargo_metadata::metadata(manifest_path)
+        .unwrap_or_else(|e| {
         error!("Could not read cargo metadata: {}", e);
         exit(-1);
     });
@@ -81,6 +95,8 @@ fn main() {
         .arg("--info=progress2")
         .arg("--exclude")
         .arg("target")
+        .arg("--rsync-path")
+        .arg("mkdir -p remote-builds && rsync")
         .arg(format!("{}/", project_dir.to_string_lossy()))
         .arg(format!("{}:~/remote-builds/{}/", build_server, project_name))
         .stdout(Stdio::inherit())
