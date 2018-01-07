@@ -81,14 +81,14 @@ fn main() {
         .arg("--exclude")
         .arg("target")
         .arg(format!("{}/", project_dir.to_string_lossy()))
-        .arg(format!("{}:/tmp/remote-build-{}/", build_server, project_name))
+        .arg(format!("{}:~/remote-builds/{}/", build_server, project_name))
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .stdin(Stdio::inherit())
         .output()
         .expect("failed to transfer project to build server");
 
-    let build_command = format!("cd /tmp/remote-build-{}/; $HOME/.cargo/bin/cargo {}", project_name, options.command);
+    let build_command = format!("cd ~/remote-builds/{}/; $HOME/.cargo/bin/cargo {}", project_name, options.command);
 
     info!("Starting build process.");
     Command::new("ssh")
@@ -106,7 +106,7 @@ fn main() {
             .arg("-a")
             .arg("--delete")
             .arg("--info=progress2")
-            .arg(format!("{}:/tmp/remote-build-{}/target/", build_server, project_name))
+            .arg(format!("{}:~/remote-builds/{}/target/", build_server, project_name))
             .arg(format!("{}/target/", project_dir.to_string_lossy()))
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
