@@ -1,26 +1,60 @@
 # Cargo Remote
 
-***Use with caution, I didn't test this software well and it is a really ugly 
-hack (at least for now).***
+***Use with caution, I didn't test this software well and it is a really hacky
+(at least for now). If you want to test it please create a VM or at least a separate
+user on your build host***
 
-## Why is it useful
+## Why I built it
 One big annoyance when working on rust projects on my notebook are the compile
 times. Since I'm using rust nightly for some of my projects I have to recompile
 rather often. Currently there seem to be no good remote-build integrations for
 rust, so I decided to build one my own.
 
 ## Planned capabilities
-This first version is very dumb (could have been a bash script), but I intend to
+This first version is very simple (could have been a bash script), but I intend to
 enhance it to a point where it detects compatibility between local and remote
 versions, allows (nearly) all cargo commands and maybe even load distribution
 over multiple machines.
 
-## Current capabilities
-For now only `cargo remote --remote=user@server build` works: it copies the
-current project to a temporary directory on the remote server, calls
-`cargo build` remotely and copies back the resulting target folder. This assumes
-that server and client are running the same rust version and have the same
-processor architecture. On the client `ssh` and `rsync` need to be installed.
+## Usage
+For now only `cargo remote [FLAGS] [OPTIONS] <command>` works: it copies the
+current project to a temporary directory (`~/remote-builds/<project_name>`) on
+the remote server, calls `cargo <command>` remotely and optionally (`-c`) copies
+back the resulting target folder. This assumes that server and client are running
+the same rust version and have the same processor architecture. On the client `ssh`
+and `rsync` need to be installed.
+
+### Configuration
+You can place a file called `.cargo-remote.toml` in the same directory as your
+`Cargo.toml`. There you can define a default remote build host and user. It can
+be overridden by the `-r` flag.
+
+Example `.cargo-remote.toml`:
+```toml
+remote = "builds@myserver"
+```
+
+### Flags and options
+```
+cargo-remote 
+
+USAGE:
+    cargo remote [FLAGS] [OPTIONS] <command>
+
+FLAGS:
+    -c, --copy-back          transfer the target folder back to the local machine
+        --help               Prints help information
+    -h, --transfer-hidden    transfer hidden files and directories to the build server
+    -V, --version            Prints version information
+
+OPTIONS:
+        --manifest-path <manifest_path>    Path to the manifest to execute
+    -r, --remote <remote>                  remote ssh build server
+
+ARGS:
+    <command>    cargo command that will be executed remotely
+```
+
 
 ## How to install
 ```bash
