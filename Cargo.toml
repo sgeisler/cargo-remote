@@ -2,6 +2,8 @@
 name = "cargo-remote"
 version = "0.1.0"
 authors = ["Sebastian Geisler <sgeisler@wh2.tu-dresden.de>"]
+license = "MIT"
+repository = "https://github.com/sgeisler/cargo-remote"
 
 [dependencies]
 structopt = "0.1.6"
