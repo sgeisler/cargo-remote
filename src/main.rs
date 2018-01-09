@@ -80,7 +80,7 @@ fn main() {
                 )
             });
 
-            // TODO: refactor argument and config parsing and merging
+            // TODO: refactor argument and config parsing and merging (related: kbknapp/clap-rs#748)
             let build_server = remote.unwrap_or_else(|| {
                 let config_path = project_dir.join(".cargo-remote.toml");
                 File::open(config_path).ok().and_then(|mut file| {
