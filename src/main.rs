@@ -1,5 +1,3 @@
-#![feature(attr_literals)]
-
 extern crate structopt;
 #[macro_use]
 extern crate structopt_derive;
@@ -18,12 +16,14 @@ use std::io::Read;
 use std::borrow::Borrow;
 
 use structopt::StructOpt;
-use structopt::clap::AppSettings;
 
 use toml::Value;
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "cargo-remote", bin_name = "cargo")]
+#[structopt(
+    name = "cargo-remote",
+    bin_name = "cargo",
+)]
 enum Opts {
     #[structopt(name = "remote")]
     Remote {
@@ -51,18 +51,28 @@ enum Opts {
         )]
         hidden: bool,
 
+        #[structopt(help = "cargo command that will be executed remotely")]
+        command: String,
+
         #[structopt(
-            help = "cargo command and flags that will be executed remotely",
-            min_values = 1
+            help = "cargo options and flags that will be applied remotely",
+            name = "remote options"
         )]
-        command: Vec<String>,
+        options: Vec<String>,
     }
 }
 
 fn main() {
     simple_logger::init().unwrap();
 
-    let Opts::Remote{remote, copy_back, manifest_path, hidden, command} = Opts::from_args();
+    let Opts::Remote{
+        remote,
+        copy_back,
+        manifest_path,
+        hidden,
+        command,
+        options
+    } = Opts::from_args();
 
     let manifest_path = manifest_path.as_ref().map(PathBuf::borrow);
     let project_metadata = cargo_metadata::metadata(manifest_path)
@@ -129,9 +139,10 @@ fn main() {
         });
 
     let build_command = format!(
-        "cd ~/remote-builds/{}/; $HOME/.cargo/bin/cargo {}",
+        "cd ~/remote-builds/{}/; $HOME/.cargo/bin/cargo {} {}",
         project_name,
-        command.iter().fold(
+        command,
+        options.iter().fold(
             String::new(),
             |acc, x| format!("{} {}", acc, x)
         )
