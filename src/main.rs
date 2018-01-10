@@ -119,7 +119,10 @@ fn main() {
                 .stderr(Stdio::inherit())
                 .stdin(Stdio::inherit())
                 .output()
-                .expect("failed to transfer project to build server");
+                .unwrap_or_else(|e| {
+                    error!("Failed to transfer project to build server (error: {})", e);
+                    exit(-4);
+                });
 
             let build_command = format!(
                 "cd ~/remote-builds/{}/; $HOME/.cargo/bin/cargo {}",
@@ -135,7 +138,10 @@ fn main() {
                 .stderr(Stdio::inherit())
                 .stdin(Stdio::inherit())
                 .output()
-                .expect("failed to build project");
+                .unwrap_or_else(|e| {
+                    error!("Failed to run cargo command remotely (error: {})", e);
+                    exit(-5);
+                });
 
             if copy_back {
                 info!("Transferring artifacts back to client.");
@@ -149,7 +155,10 @@ fn main() {
                     .stderr(Stdio::inherit())
                     .stdin(Stdio::inherit())
                     .output()
-                    .expect("failed to transfer built project to client");
+                    .unwrap_or_else(|e| {
+                        error!("Failed to transfer target back to local machine (error: {})", e);
+                        exit(-6);
+                    });
             }
         }
     }
