@@ -24,6 +24,12 @@ back the resulting target folder. This assumes that server and client are runnin
 the same rust version and have the same processor architecture. On the client `ssh`
 and `rsync` need to be installed.
 
+If you want to pass remote flags you have to end the options/flags section using
+`--`. E.g. to build in release mode and copy back the result use: 
+```bash
+cargo remote -c -- build --release
+```
+
 ### Configuration
 You can place a file called `.cargo-remote.toml` in the same directory as your
 `Cargo.toml`. There you can define a default remote build host and user. It can
