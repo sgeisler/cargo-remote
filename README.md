@@ -31,11 +31,11 @@ cargo remote -c -- build --release
 ```
 
 ### Configuration
-You can place a file called `.cargo-remote.toml` in the same directory as your
-`Cargo.toml`. There you can define a default remote build host and user. It can
-be overridden by the `-r` flag.
+You can place a config file called `.cargo-remote.toml` in the same directory as your
+`Cargo.toml` or at `~/.config/cargo-remote/cargo-remote.toml`. There you can define a
+default remote build host and user. It can be overridden by the `-r` flag.
 
-Example `.cargo-remote.toml`:
+Example config file:
 ```toml
 remote = "builds@myserver"
 ```

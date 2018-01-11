@@ -9,6 +9,8 @@ extern crate simple_logger;
 
 extern crate toml;
 
+extern crate xdg;
+
 use std::process::{exit, Command, Stdio};
 use std::path::{Path, PathBuf};
 use std::fs::File;
@@ -62,6 +64,22 @@ enum Opts {
     }
 }
 
+/// Tries to parse the file [`config_path`]. Logs warnings and returns [`None`] if errors occur
+/// during reading or parsing, [`Some(Value)`] otherwise.
+fn config_from_file(config_path: &Path) -> Option<Value> {
+    File::open(config_path).ok().and_then(|mut file| {
+        let mut config_file_string = "".to_owned();
+        file.read_to_string(&mut config_file_string).or_else(|e| {
+            warn!("Can't read config file '{}' (error: {})", config_path.to_string_lossy(), e);
+            Err(e)
+        }).ok()?;
+        config_file_string.parse::<Value>().or_else(|e| {
+            warn!("Can't parse config file '{}' (error: {})", config_path.to_string_lossy(), e);
+            Err(e)
+        }).ok()
+    })
+}
+
 fn main() {
     simple_logger::init().unwrap();
 
@@ -94,21 +112,27 @@ fn main() {
         )
     });
 
-    // TODO: refactor argument and config parsing and merging (related: kbknapp/clap-rs#748)
-    let build_server = remote.unwrap_or_else(|| {
-        let config_path = project_dir.join(".cargo-remote.toml");
-        File::open(config_path).ok().and_then(|mut file| {
-            let mut config_file_string = "".to_owned();
-            // ignore the result for now, the whole config/argument parsing needs to
-            // be refactored
-            let _ = file.read_to_string(&mut config_file_string);
-            config_file_string.parse::<Value>().ok()
-        }).and_then(|value| {
-            value["remote"].as_str().map(str::to_owned)
-        }).unwrap_or_else(|| {
-            error!("No remote build server was defined (use config file or --remote flag)");
-            exit(-3);
-        })
+    let configs = vec![
+        config_from_file(&project_dir.join(".cargo-remote.toml")),
+        xdg::BaseDirectories::with_prefix("cargo-remote")
+            .ok()
+            .and_then(|base| base.find_config_file("cargo-remote.toml"))
+            .and_then(|p: PathBuf| config_from_file(&p)
+        ),
+    ];
+
+    // TODO: move Opts::Remote fields into own type and implement complete_from_config(&mut self, config: &Value)
+    let build_server = remote.or_else(|| {
+        configs.into_iter()
+            .flat_map(|config| {
+                config.and_then(|c| {
+                    c["remote"].as_str().map(str::to_owned)
+                })
+            })
+            .next()
+    }).unwrap_or_else(|| {
+        error!("No remote build server was defined (use config file or --remote flag)");
+        exit(-3);
     });
 
     info!("Transferring sources to build server.");
