@@ -190,6 +190,7 @@ fn main() {
         Command::new("rsync")
             .arg("-a")
             .arg("--delete")
+            .arg("--compress")
             .arg("--info=progress2")
             .arg(format!("{}:~/remote-builds/{}/target/", build_server, project_name))
             .arg(format!("{}/target/", project_dir.to_string_lossy()))
