@@ -87,7 +87,7 @@ fn main() {
     } = Opts::from_args();
 
     let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
-    metadata_cmd.manifest_path(manifest_path);
+    metadata_cmd.manifest_path(manifest_path).no_deps();
 
     let project_metadata = metadata_cmd.exec().unwrap();
 
@@ -97,15 +97,7 @@ fn main() {
             error!("No project found.");
             exit(-2);
         },
-        |project| {
-            (
-                project.manifest_path
-                    .as_path()
-                    .parent()
-                    .expect("Cargo.toml seems to have no parent directory?"),
-                &project.name,
-            )
-        },
+        |project| (&project_metadata.workspace_root, &project.name),
     );
 
     let configs = vec![
@@ -149,10 +141,7 @@ fn main() {
         .arg("--rsync-path")
         .arg("mkdir -p remote-builds && rsync")
         .arg(format!("{}/", project_dir.to_string_lossy()))
-        .arg(format!(
-            "{}:{}",
-            build_server, build_path
-        ))
+        .arg(format!("{}:{}", build_server, build_path))
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .stdin(Stdio::inherit())
@@ -164,8 +153,7 @@ fn main() {
 
     let build_command = format!(
         "cd {}; $HOME/.cargo/bin/cargo {} {}",
-        build_path
-        project_name,
+        build_path,
         command,
         options.join(" ")
     );
@@ -191,10 +179,7 @@ fn main() {
             .arg("--delete")
             .arg("--compress")
             .arg("--info=progress2")
-            .arg(format!(
-                "{}:{}/target/",
-                build_server, build_path
-            ))
+            .arg(format!("{}:{}/target/", build_server, build_path))
             .arg(format!("{}/target/", project_dir.to_string_lossy()))
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
