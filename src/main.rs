@@ -152,7 +152,7 @@ fn main() {
         });
 
     let build_command = format!(
-        "cd {}; cargo {} {}",
+        "source /etc/profile; cd {}; cargo {} {}",
         build_path,
         command,
         options.join(" ")
