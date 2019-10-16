@@ -152,7 +152,7 @@ fn main() {
         });
 
     let build_command = format!(
-        "cd {}; $HOME/.cargo/bin/cargo {} {}",
+        "cd {}; cargo {} {}",
         build_path,
         command,
         options.join(" ")
