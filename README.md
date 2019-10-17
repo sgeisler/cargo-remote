@@ -25,7 +25,7 @@ the same rust version and have the same processor architecture. On the client `s
 and `rsync` need to be installed.
 
 If you want to pass remote flags you have to end the options/flags section using
-`--`. E.g. to build in release mode and copy back the result use: 
+`--`. E.g. to build in release mode and copy back the result use:
 ```bash
 cargo remote -c -- build --release
 ```
@@ -42,23 +42,27 @@ remote = "builds@myserver"
 
 ### Flags and options
 ```
-cargo-remote 
-
 USAGE:
-    cargo remote [FLAGS] [OPTIONS] <command>
+    cargo remote [FLAGS] [OPTIONS] <command> [remote options]...
 
 FLAGS:
-    -c, --copy-back          transfer the target folder back to the local machine
+    -c, --copy-back          Transfer the target folder back to the local machine
         --help               Prints help information
-    -h, --transfer-hidden    transfer hidden files and directories to the build server
+    -h, --transfer-hidden    Transfer hidden files and directories to the build server
     -V, --version            Prints version information
 
 OPTIONS:
-        --manifest-path <manifest_path>    Path to the manifest to execute
-    -r, --remote <remote>                  remote ssh build server
+    -b, --build-env <build_env>              Set remote environment variables. RUST_BACKTRACE, CC, LIB, etc.  [default:
+                                             RUST_BACKTRACE=1]
+    -e, --env <env>                          Environment profile. default_value = /etc/profile [default: /etc/profile]
+        --manifest-path <manifest_path>      Path to the manifest to execute [default: Cargo.toml]
+    -r, --remote <remote>                    Remote ssh build server
+    -d, --rustup-default <rustup_default>    Rustup default (stable|beta|nightly) [default: stable]
 
 ARGS:
-    <command>    cargo command that will be executed remotely
+    <command>              cargo command that will be executed remotely
+    <remote options>...    cargo options and flags that will be applied remotely
+
 ```
 
 
