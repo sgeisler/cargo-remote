@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 use std::process::{exit, Command, Stdio};
-
 use structopt::StructOpt;
 use toml::Value;
 
@@ -11,13 +10,37 @@ use log::{error, info, warn};
 enum Opts {
     #[structopt(name = "remote")]
     Remote {
-        #[structopt(short = "r", long = "remote", help = "remote ssh build server")]
+        #[structopt(short = "r", long = "remote", help = "Remote ssh build server")]
         remote: Option<String>,
+
+        #[structopt(
+            short = "b",
+            long = "build-env",
+            help = "Set remote environment variables. RUST_BACKTRACE, CC, LIB, etc. ",
+            default_value = "RUST_BACKTRACE=1"
+        )]
+        build_env: String,
+
+        #[structopt(
+            short = "d",
+            long = "rustup-default",
+            help = "Rustup default (stable|beta|nightly)",
+            default_value = "stable"
+        )]
+        rustup_default: String,
+
+        #[structopt(
+            short = "e",
+            long = "env",
+            help = "Environment profile. default_value = /etc/profile",
+            default_value = "/etc/profile"
+        )]
+        env: String,
 
         #[structopt(
             short = "c",
             long = "copy-back",
-            help = "transfer the target folder back to the local machine"
+            help = "Transfer the target folder back to the local machine"
         )]
         copy_back: bool,
 
@@ -32,7 +55,7 @@ enum Opts {
         #[structopt(
             short = "h",
             long = "transfer-hidden",
-            help = "transfer hidden files and directories to the build server"
+            help = "Transfer hidden files and directories to the build server"
         )]
         hidden: bool,
 
@@ -79,6 +102,9 @@ fn main() {
 
     let Opts::Remote {
         remote,
+        build_env,
+        rustup_default,
+        env,
         copy_back,
         manifest_path,
         hidden,
@@ -90,16 +116,22 @@ fn main() {
     metadata_cmd.manifest_path(manifest_path).no_deps();
 
     let project_metadata = metadata_cmd.exec().unwrap();
-
-    // for now, assume that there is only one project and find it's root directory
-    let (project_dir, project_name) = project_metadata.packages.first().map_or_else(
-        || {
-            error!("No project found.");
-            exit(-2);
-        },
-        |project| (&project_metadata.workspace_root, &project.name),
-    );
-
+    let project_dir = project_metadata.workspace_root;
+    info!("Project dir: {:?}", project_dir);
+    let mut manifest_path = project_dir.clone();
+    manifest_path.push("Cargo.toml");
+    let project_name = project_metadata
+        .packages
+        .iter()
+        .find(|p| p.manifest_path == manifest_path)
+        .map_or_else(
+            || {
+                error!("No project found.");
+                exit(-2);
+            },
+            |p| &p.name,
+        );
+    info!("Project name: {:?}", project_name);
     let configs = vec![
         config_from_file(&project_dir.join(".cargo-remote.toml")),
         xdg::BaseDirectories::with_prefix("cargo-remote")
@@ -121,7 +153,7 @@ fn main() {
             exit(-3);
         });
 
-    let build_path = format!("~/remote-builds/{}/", project_name);
+    let build_path = format!("~/remote-builds/{:?}/", project_name);
 
     info!("Transferring sources to build server.");
     // transfer project to build server
@@ -129,6 +161,7 @@ fn main() {
     rsync_to
         .arg("-a".to_owned())
         .arg("--delete")
+        .arg("--compress")
         .arg("--info=progress2")
         .arg("--exclude")
         .arg("target");
@@ -150,17 +183,22 @@ fn main() {
             error!("Failed to transfer project to build server (error: {})", e);
             exit(-4);
         });
-
+    info!("Build ENV: {:?}", build_env);
+    info!("Environment profile: {:?}", env);
+    info!("Build path: {:?}", build_path);
     let build_command = format!(
-        "source /etc/profile; cd {}; cargo {} {}",
+        "source {}; rustup default {}; cd {}; {} cargo {} {}",
+        env,
+        rustup_default,
         build_path,
+        build_env,
         command,
         options.join(" ")
     );
 
     info!("Starting build process.");
     Command::new("ssh")
-        .arg("-t")
+        //.arg("-t")
         .arg(&build_server)
         .arg(build_command)
         .stdout(Stdio::inherit())
