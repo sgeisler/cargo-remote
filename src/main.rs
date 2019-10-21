@@ -17,9 +17,9 @@ enum Opts {
         #[structopt(
             short = "c",
             long = "copy-back",
-            help = "transfer the target folder back to the local machine"
+            help = "transfer the target folder or specific file from that folder back to the local machine"
         )]
-        copy_back: bool,
+        copy_back: Option<Option<String>>,
 
         #[structopt(
             long = "no-copy-lock",
@@ -179,15 +179,16 @@ fn main() {
             exit(-5);
         });
 
-    if copy_back {
+    if let Some(file_name) = copy_back {
         info!("Transferring artifacts back to client.");
+        let file_name = file_name.unwrap_or_else(String::new);
         Command::new("rsync")
             .arg("-a")
             .arg("--delete")
             .arg("--compress")
             .arg("--info=progress2")
-            .arg(format!("{}:{}/target/", build_server, build_path))
-            .arg(format!("{}/target/", project_dir.to_string_lossy()))
+            .arg(format!("{}:{}/target/{}", build_server, build_path, file_name))
+            .arg(format!("{}/target/{}", project_dir.to_string_lossy(), file_name))
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .stdin(Stdio::inherit())
