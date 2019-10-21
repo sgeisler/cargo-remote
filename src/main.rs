@@ -22,6 +22,12 @@ enum Opts {
         copy_back: bool,
 
         #[structopt(
+            long = "no-copy-lock",
+            help = "don't transfer the Cargo.lock file back to the local machine"
+        )]
+        no_copy_lock: bool,
+
+        #[structopt(
             long = "manifest-path",
             help = "Path to the manifest to execute",
             default_value = "Cargo.toml",
@@ -80,6 +86,7 @@ fn main() {
     let Opts::Remote {
         remote,
         copy_back,
+        no_copy_lock,
         manifest_path,
         hidden,
         command,
@@ -188,6 +195,28 @@ fn main() {
             .unwrap_or_else(|e| {
                 error!(
                     "Failed to transfer target back to local machine (error: {})",
+                    e
+                );
+                exit(-6);
+            });
+    }
+
+    if !no_copy_lock {
+        info!("Transferring Cargo.lock file back to client.");
+        Command::new("rsync")
+            .arg("-a")
+            .arg("--delete")
+            .arg("--compress")
+            .arg("--info=progress2")
+            .arg(format!("{}:{}/Cargo.lock", build_server, build_path))
+            .arg(format!("{}/Cargo.lock", project_dir.to_string_lossy()))
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .stdin(Stdio::inherit())
+            .output()
+            .unwrap_or_else(|e| {
+                error!(
+                    "Failed to transfer Cargo.lock back to local machine (error: {})",
                     e
                 );
                 exit(-6);
