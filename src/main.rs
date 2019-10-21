@@ -166,7 +166,7 @@ fn main() {
     );
 
     info!("Starting build process.");
-    Command::new("ssh")
+    let output = Command::new("ssh")
         .arg("-t")
         .arg(&build_server)
         .arg(build_command)
@@ -221,5 +221,9 @@ fn main() {
                 );
                 exit(-6);
             });
+    }
+
+    if !output.status.success() {
+        exit(output.status.code().unwrap_or(0))
     }
 }
