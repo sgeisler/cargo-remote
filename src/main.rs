@@ -220,7 +220,7 @@ fn main() {
                     "Failed to transfer Cargo.lock back to local machine (error: {})",
                     e
                 );
-                exit(-6);
+                exit(-7);
             });
     }
 
