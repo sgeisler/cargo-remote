@@ -225,6 +225,6 @@ fn main() {
     }
 
     if !output.status.success() {
-        exit(output.status.code().unwrap_or(0))
+        exit(output.status.code().unwrap_or(1))
     }
 }
