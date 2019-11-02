@@ -120,17 +120,17 @@ fn main() {
     info!("Project dir: {:?}", project_dir);
     let mut manifest_path = project_dir.clone();
     manifest_path.push("Cargo.toml");
-    let project_name = project_metadata
-        .packages
-        .iter()
-        .find(|p| p.manifest_path == manifest_path)
-        .map_or_else(
-            || {
-                info!("No metadata found. Use project dir name for remote");
-                |p| p.name == project_dir;
-            },
-            |p| &p.name,
-        );
+    let project_name = project_dir;
+//        .packages
+//       .iter()
+//        .find(|p| p.manifest_path == manifest_path)
+//        .map_or_else(
+//            || {
+//                info!("No metadata found. Use project dir name for remote");
+//                |p| p.name == project_dir;
+//            },
+//            |p| &p.name,
+//        );
     info!("Project name: {:?}", project_name);
     let configs = vec![
         config_from_file(&project_dir.join(".cargo-remote.toml")),
