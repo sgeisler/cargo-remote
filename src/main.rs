@@ -126,8 +126,7 @@ fn main() {
         .find(|p| p.manifest_path == manifest_path)
         .map_or_else(
             || {
-                error!("No project found.");
-                exit(-2);
+                info!("No metadata found. Use project dir name for remote");
             },
             |p| &p.name,
         );
