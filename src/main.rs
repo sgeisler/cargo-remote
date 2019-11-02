@@ -127,6 +127,7 @@ fn main() {
         .map_or_else(
             || {
                 info!("No metadata found. Use project dir name for remote");
+                |p| p.name == project_dir;
             },
             |p| &p.name,
         );
