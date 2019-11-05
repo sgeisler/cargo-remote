@@ -17,9 +17,15 @@ enum Opts {
         #[structopt(
             short = "c",
             long = "copy-back",
-            help = "transfer the target folder back to the local machine"
+            help = "transfer the target folder or specific file from that folder back to the local machine"
         )]
-        copy_back: bool,
+        copy_back: Option<Option<String>>,
+
+        #[structopt(
+            long = "no-copy-lock",
+            help = "don't transfer the Cargo.lock file back to the local machine"
+        )]
+        no_copy_lock: bool,
 
         #[structopt(
             long = "manifest-path",
@@ -80,6 +86,7 @@ fn main() {
     let Opts::Remote {
         remote,
         copy_back,
+        no_copy_lock,
         manifest_path,
         hidden,
         command,
@@ -159,7 +166,7 @@ fn main() {
     );
 
     info!("Starting build process.");
-    Command::new("ssh")
+    let output = Command::new("ssh")
         .arg("-t")
         .arg(&build_server)
         .arg(build_command)
@@ -172,15 +179,16 @@ fn main() {
             exit(-5);
         });
 
-    if copy_back {
+    if let Some(file_name) = copy_back {
         info!("Transferring artifacts back to client.");
+        let file_name = file_name.unwrap_or_else(String::new);
         Command::new("rsync")
             .arg("-a")
             .arg("--delete")
             .arg("--compress")
             .arg("--info=progress2")
-            .arg(format!("{}:{}/target/", build_server, build_path))
-            .arg(format!("{}/target/", project_dir.to_string_lossy()))
+            .arg(format!("{}:{}/target/{}", build_server, build_path, file_name))
+            .arg(format!("{}/target/{}", project_dir.to_string_lossy(), file_name))
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .stdin(Stdio::inherit())
@@ -192,5 +200,31 @@ fn main() {
                 );
                 exit(-6);
             });
+    }
+
+    if !no_copy_lock {
+        info!("Transferring Cargo.lock file back to client.");
+        Command::new("rsync")
+            .arg("-a")
+            .arg("--delete")
+            .arg("--compress")
+            .arg("--info=progress2")
+            .arg(format!("{}:{}/Cargo.lock", build_server, build_path))
+            .arg(format!("{}/Cargo.lock", project_dir.to_string_lossy()))
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .stdin(Stdio::inherit())
+            .output()
+            .unwrap_or_else(|e| {
+                error!(
+                    "Failed to transfer Cargo.lock back to local machine (error: {})",
+                    e
+                );
+                exit(-7);
+            });
+    }
+
+    if !output.status.success() {
+        exit(output.status.code().unwrap_or(1))
     }
 }
