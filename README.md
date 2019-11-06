@@ -68,6 +68,6 @@ ARGS:
 
 ## How to install
 ```bash
-git clone https://gitlab.parity.io/General-Beck/cargo-remote.git
+git clone https://github.com/sgeisler/cargo-remote
 cargo install --path cargo-remote/
 ```

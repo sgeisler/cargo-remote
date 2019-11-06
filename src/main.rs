@@ -133,8 +133,8 @@ fn main() {
         .find(|p| p.manifest_path == manifest_path)
         .map_or_else(
             || {
-                error!("No metadata found. Use --manifest_path for execute");
-                exit(-2);
+                info!("No metadata found. Setting the remote dir name like the local. Or use --manifest_path for execute");
+                project_dir.file_name().and_then(|x| x.to_str()).unwrap()
             },
             |p| &p.name,
         );
