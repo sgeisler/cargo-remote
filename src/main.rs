@@ -134,7 +134,7 @@ fn main() {
         .map_or_else(
             || {
                 error!("No metadata found. Use --manifest_path for execute");
-                exit(-2);
+                project_dir.file_name().and_then(|x| x.to_str()).unwrap()
             },
             |p| &p.name,
         );
