@@ -5,6 +5,8 @@ use toml::Value;
 
 use log::{error, info, warn};
 
+const PROGRESS_FLAG: &str = "--info=progress2";
+
 #[derive(StructOpt, Debug)]
 #[structopt(name = "cargo-remote", bin_name = "cargo")]
 enum Opts {
