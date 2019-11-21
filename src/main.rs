@@ -207,6 +207,7 @@ fn main() {
 
     info!("Starting build process.");
     let output = Command::new("ssh")
+        .arg("-t")
         .arg(&build_server)
         .arg(build_command)
         .stdout(Stdio::inherit())
