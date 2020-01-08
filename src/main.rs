@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::process::{exit, Command, Stdio};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use structopt::StructOpt;
 use toml::Value;
 
@@ -127,20 +129,7 @@ fn main() {
     let project_metadata = metadata_cmd.exec().unwrap();
     let project_dir = project_metadata.workspace_root;
     info!("Project dir: {:?}", project_dir);
-    let mut manifest_path = project_dir.clone();
-    manifest_path.push("Cargo.toml");
-    let project_name = project_metadata
-        .packages
-        .iter()
-        .find(|p| p.manifest_path == manifest_path)
-        .map_or_else(
-            || {
-                info!("No metadata found. Setting the remote dir name like the local. Or use --manifest_path for execute");
-                project_dir.file_name().and_then(|x| x.to_str()).unwrap()
-            },
-            |p| &p.name,
-        );
-    info!("Project name: {:?}", project_name);
+
     let configs = vec![
         config_from_file(&project_dir.join(".cargo-remote.toml")),
         xdg::BaseDirectories::with_prefix("cargo-remote")
@@ -162,7 +151,10 @@ fn main() {
             exit(-3);
         });
 
-    let build_path = format!("~/remote-builds/{:?}/", project_name);
+    // generate a unique build path by using the hashed project dir as folder on the remote machine
+    let mut hasher = DefaultHasher::new();
+    project_dir.hash(&mut hasher);
+    let build_path = format!("~/remote-builds/{:?}/", hasher.finish());
 
     info!("Transferring sources to build server.");
     // transfer project to build server
