@@ -154,7 +154,7 @@ fn main() {
     // generate a unique build path by using the hashed project dir as folder on the remote machine
     let mut hasher = DefaultHasher::new();
     project_dir.hash(&mut hasher);
-    let build_path = format!("~/remote-builds/{:?}/", hasher.finish());
+    let build_path = format!("~/remote-builds/{}/", hasher.finish());
 
     info!("Transferring sources to build server.");
     // transfer project to build server
