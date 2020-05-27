@@ -1,7 +1,7 @@
-use std::path::{Path, PathBuf};
-use std::process::{exit, Command, Stdio};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::path::{Path, PathBuf};
+use std::process::{exit, Command, Stdio};
 use structopt::StructOpt;
 use toml::Value;
 
@@ -16,6 +16,13 @@ enum Opts {
     Remote {
         #[structopt(short = "r", long = "remote", help = "Remote ssh build server")]
         remote: Option<String>,
+
+        #[structopt(
+            short = "p",
+            long = "port",
+            help = "Custom port for ssh on the build server"
+        )]
+        port: Option<String>,
 
         #[structopt(
             short = "b",
@@ -112,6 +119,7 @@ fn main() {
 
     let Opts::Remote {
         remote,
+        port,
         build_env,
         rustup_default,
         env,
@@ -154,7 +162,7 @@ fn main() {
     // generate a unique build path by using the hashed project dir as folder on the remote machine
     let mut hasher = DefaultHasher::new();
     project_dir.hash(&mut hasher);
-    let build_path = format!("~/remote-builds/{}/", hasher.finish());
+    let build_path = format!("~/remote-builds/{}", hasher.finish());
 
     info!("Transferring sources to build server.");
     // transfer project to build server
@@ -163,6 +171,11 @@ fn main() {
         .arg("-a".to_owned())
         .arg("--delete")
         .arg("--compress")
+        .arg(if port.is_some() {
+            format!("-e ssh -p {}", port.clone().unwrap())
+        } else {
+            "".to_string()
+        })
         .arg("--info=progress2")
         .arg("--exclude")
         .arg("target");
@@ -199,6 +212,11 @@ fn main() {
 
     info!("Starting build process.");
     let output = Command::new("ssh")
+        .arg(if port.is_some() {
+            format!("-p {}", port.clone().unwrap())
+        } else {
+            "".to_string()
+        })
         .arg("-t")
         .arg(&build_server)
         .arg(build_command)
@@ -218,9 +236,21 @@ fn main() {
             .arg("-a")
             .arg("--delete")
             .arg("--compress")
+            .arg(if port.is_some() {
+                format!("-e ssh -p {}", port.clone().unwrap())
+            } else {
+                "".to_string()
+            })
             .arg("--info=progress2")
-            .arg(format!("{}:{}/target/{}", build_server, build_path, file_name))
-            .arg(format!("{}/target/{}", project_dir.to_string_lossy(), file_name))
+            .arg(format!(
+                "{}:{}/target/{}",
+                build_server, build_path, file_name
+            ))
+            .arg(format!(
+                "{}/target/{}",
+                project_dir.to_string_lossy(),
+                file_name
+            ))
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .stdin(Stdio::inherit())
@@ -240,6 +270,11 @@ fn main() {
             .arg("-a")
             .arg("--delete")
             .arg("--compress")
+            .arg(if port.is_some() {
+                format!("-e ssh -p {}", port.clone().unwrap())
+            } else {
+                "".to_string()
+            })
             .arg("--info=progress2")
             .arg(format!("{}:{}/Cargo.lock", build_server, build_path))
             .arg(format!("{}/Cargo.lock", project_dir.to_string_lossy()))
