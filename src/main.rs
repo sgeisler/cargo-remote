@@ -1,11 +1,12 @@
-use std::path::{Path, PathBuf};
-use std::process::{exit, Command, Stdio};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::path::PathBuf;
+use std::process::{exit, Command, Stdio};
 use structopt::StructOpt;
-use toml::Value;
 
 use log::{error, info, warn};
+
+mod config;
 
 const PROGRESS_FLAG: &str = "--info=progress2";
 
@@ -80,33 +81,6 @@ enum Opts {
     },
 }
 
-/// Tries to parse the file [`config_path`]. Logs warnings and returns [`None`] if errors occur
-/// during reading or parsing, [`Some(Value)`] otherwise.
-fn config_from_file(config_path: &Path) -> Option<Value> {
-    let config_file = std::fs::read_to_string(config_path)
-        .map_err(|e| {
-            warn!(
-                "Can't parse config file '{}' (error: {})",
-                config_path.to_string_lossy(),
-                e
-            );
-        })
-        .ok()?;
-
-    let value = config_file
-        .parse::<Value>()
-        .map_err(|e| {
-            warn!(
-                "Can't parse config file '{}' (error: {})",
-                config_path.to_string_lossy(),
-                e
-            );
-        })
-        .ok()?;
-
-    Some(value)
-}
-
 fn main() {
     simple_logger::init().unwrap();
 
@@ -130,31 +104,20 @@ fn main() {
     let project_dir = project_metadata.workspace_root;
     info!("Project dir: {:?}", project_dir);
 
-    let configs = vec![
-        config_from_file(&project_dir.join(".cargo-remote.toml")),
-        xdg::BaseDirectories::with_prefix("cargo-remote")
-            .ok()
-            .and_then(|base| base.find_config_file("cargo-remote.toml"))
-            .and_then(|p: PathBuf| config_from_file(&p)),
-    ];
-
-    // TODO: move Opts::Remote fields into own type and implement complete_from_config(&mut self, config: &Value)
-    let build_server = remote
-        .or_else(|| {
-            configs
-                .into_iter()
-                .flat_map(|config| config.and_then(|c| c["remote"].as_str().map(String::from)))
-                .next()
-        })
-        .unwrap_or_else(|| {
-            error!("No remote build server was defined (use config file or --remote flag)");
+    let conf = match config::Config::new(&project_dir) {
+        Ok(conf) => conf,
+        Err(error) => {
+            error!("{}", error);
             exit(-3);
-        });
+        }
+    };
+
+    let build_server = remote.unwrap_or_else(|| conf.remote.user_host());
 
     // generate a unique build path by using the hashed project dir as folder on the remote machine
     let mut hasher = DefaultHasher::new();
     project_dir.hash(&mut hasher);
-    let build_path = format!("~/remote-builds/{}/", hasher.finish());
+    let build_path = format!("{}/{}/", conf.remote.temp_dir, hasher.finish());
 
     info!("Transferring sources to build server.");
     // transfer project to build server
@@ -163,6 +126,7 @@ fn main() {
         .arg("-a".to_owned())
         .arg("--delete")
         .arg("--compress")
+        .arg(format!("-e ssh -p {}", conf.remote.ssh_port))
         .arg("--info=progress2")
         .arg("--exclude")
         .arg("target");
@@ -199,6 +163,7 @@ fn main() {
 
     info!("Starting build process.");
     let output = Command::new("ssh")
+        .arg(format!("-p {}", conf.remote.ssh_port))
         .arg("-t")
         .arg(&build_server)
         .arg(build_command)
@@ -218,9 +183,17 @@ fn main() {
             .arg("-a")
             .arg("--delete")
             .arg("--compress")
+            .arg(format!("-e ssh -p {}", conf.remote.ssh_port))
             .arg("--info=progress2")
-            .arg(format!("{}:{}/target/{}", build_server, build_path, file_name))
-            .arg(format!("{}/target/{}", project_dir.to_string_lossy(), file_name))
+            .arg(format!(
+                "{}:{}/target/{}",
+                build_server, build_path, file_name
+            ))
+            .arg(format!(
+                "{}/target/{}",
+                project_dir.to_string_lossy(),
+                file_name
+            ))
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .stdin(Stdio::inherit())
@@ -240,6 +213,7 @@ fn main() {
             .arg("-a")
             .arg("--delete")
             .arg("--compress")
+            .arg(format!("-e ssh -p {}", conf.remote.ssh_port))
             .arg("--info=progress2")
             .arg(format!("{}:{}/Cargo.lock", build_server, build_path))
             .arg(format!("{}/Cargo.lock", project_dir.to_string_lossy()))
