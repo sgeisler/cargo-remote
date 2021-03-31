@@ -10,7 +10,7 @@ pub struct Remote {
 }
 
 #[derive(Debug, Deserialize)]
-struct OptionRemote {
+struct PartialRemote {
     pub name: Option<String>,
     pub host: String,
     pub user: String,
@@ -30,8 +30,8 @@ impl Default for Remote {
     }
 }
 
-impl From<OptionRemote> for Remote {
-    fn from(minimal_remote: OptionRemote) -> Self {
+impl From<PartialRemote> for Remote {
+    fn from(minimal_remote: PartialRemote) -> Self {
         let default = Remote::default();
         let name = minimal_remote.name.unwrap_or(default.name);
         let ssh_port = minimal_remote.ssh_port.unwrap_or(default.ssh_port);
@@ -51,7 +51,7 @@ impl<'de> Deserialize<'de> for Remote {
     where
         D: serde::Deserializer<'de>,
     {
-        OptionRemote::deserialize(deserializer).map(Self::from)
+        PartialRemote::deserialize(deserializer).map(Self::from)
     }
 }
 
