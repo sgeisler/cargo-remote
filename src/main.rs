@@ -12,93 +12,91 @@ const PROGRESS_FLAG: &str = "--info=progress2";
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "cargo-remote", bin_name = "cargo")]
-enum Opts {
-    #[structopt(name = "remote")]
-    Remote {
-        #[structopt(short = "r", long = "remote", help = "Remote ssh build server")]
-        remote: Option<String>,
+pub struct Opts {
+    #[structopt(short = "r", long = "remote", help = "Remote ssh build server")]
+    remote_name: Option<String>,
 
-        #[structopt(
-            short = "b",
-            long = "build-env",
-            help = "Set remote environment variables. RUST_BACKTRACE, CC, LIB, etc. ",
-            default_value = "RUST_BACKTRACE=1"
-        )]
-        build_env: String,
+    #[structopt(short, long, help = "")]
+    remote_host: Option<String>,
 
-        #[structopt(
-            short = "d",
-            long = "rustup-default",
-            help = "Rustup default (stable|beta|nightly)",
-            default_value = "stable"
-        )]
-        rustup_default: String,
+    #[structopt(short, long, help = "")]
+    remote_user: Option<String>,
 
-        #[structopt(
-            short = "e",
-            long = "env",
-            help = "Environment profile. default_value = /etc/profile",
-            default_value = "/etc/profile"
-        )]
-        env: String,
+    #[structopt(short, long, help = "")]
+    remote_ssh_port: Option<u16>,
 
-        #[structopt(
-            short = "c",
-            long = "copy-back",
-            help = "Transfer the target folder or specific file from that folder back to the local machine"
-        )]
-        copy_back: Option<Option<String>>,
+    #[structopt(short, long, help = "")]
+    remote_temp_dir: Option<String>,
 
-        #[structopt(
-            long = "no-copy-lock",
-            help = "don't transfer the Cargo.lock file back to the local machine"
-        )]
-        no_copy_lock: bool,
+    #[structopt(
+        short = "b",
+        long = "build-env",
+        help = "Set remote environment variables. RUST_BACKTRACE, CC, LIB, etc. ",
+        default_value = "RUST_BACKTRACE=1"
+    )]
+    build_env: String,
 
-        #[structopt(
-            long = "manifest-path",
-            help = "Path to the manifest to execute",
-            default_value = "Cargo.toml",
-            parse(from_os_str)
-        )]
-        manifest_path: PathBuf,
+    #[structopt(
+        short = "d",
+        long = "rustup-default",
+        help = "Rustup default (stable|beta|nightly)",
+        default_value = "stable"
+    )]
+    rustup_default: String,
 
-        #[structopt(
-            short = "h",
-            long = "transfer-hidden",
-            help = "Transfer hidden files and directories to the build server"
-        )]
-        hidden: bool,
+    #[structopt(
+        short = "e",
+        long = "env",
+        help = "Environment profile. default_value = /etc/profile",
+        default_value = "/etc/profile"
+    )]
+    env: String,
 
-        #[structopt(help = "cargo command that will be executed remotely")]
-        command: String,
+    #[structopt(
+        short = "c",
+        long = "copy-back",
+        help = "Transfer the target folder or specific file from that folder back to the local machine"
+    )]
+    copy_back: Option<Option<String>>,
 
-        #[structopt(
-            help = "cargo options and flags that will be applied remotely",
-            name = "remote options"
-        )]
-        options: Vec<String>,
-    },
+    #[structopt(
+        long = "no-copy-lock",
+        help = "don't transfer the Cargo.lock file back to the local machine"
+    )]
+    no_copy_lock: bool,
+
+    #[structopt(
+        long = "manifest-path",
+        help = "Path to the manifest to execute",
+        default_value = "Cargo.toml",
+        parse(from_os_str)
+    )]
+    manifest_path: PathBuf,
+
+    #[structopt(
+        short = "h",
+        long = "transfer-hidden",
+        help = "Transfer hidden files and directories to the build server"
+    )]
+    hidden: bool,
+
+    #[structopt(help = "cargo command that will be executed remotely")]
+    command: String,
+
+    #[structopt(
+        help = "cargo options and flags that will be applied remotely",
+        name = "remote options"
+    )]
+    options: Vec<String>,
 }
 
 fn main() {
     simple_logger::init().unwrap();
 
-    let Opts::Remote {
-        remote,
-        build_env,
-        rustup_default,
-        env,
-        copy_back,
-        no_copy_lock,
-        manifest_path,
-        hidden,
-        command,
-        options,
-    } = Opts::from_args();
+    let opts = Opts::from_args();
 
     let mut metadata_cmd = cargo_metadata::MetadataCommand::new();
-    metadata_cmd.manifest_path(manifest_path).no_deps();
+    metadata_cmd.manifest_path(&opts.manifest_path).no_deps();
 
     let project_metadata = metadata_cmd.exec().unwrap();
     let project_dir = project_metadata.workspace_root;
@@ -112,12 +110,32 @@ fn main() {
         }
     };
 
-    let build_server = remote.unwrap_or_else(|| conf.remote.user_host());
+    let remote = match conf.get_remote(&opts) {
+        Some(remote) => remote,
+        None => {
+            error!("No remote build server was defined (use config file or the --remote flags)");
+            exit(4);
+        }
+    };
+
+    let build_server = remote.user_host();
+
+    let Opts {
+        build_env,
+        rustup_default,
+        env,
+        copy_back,
+        no_copy_lock,
+        hidden,
+        command,
+        options,
+        ..
+    } = opts;
 
     // generate a unique build path by using the hashed project dir as folder on the remote machine
     let mut hasher = DefaultHasher::new();
     project_dir.hash(&mut hasher);
-    let build_path = format!("{}/{}/", conf.remote.temp_dir, hasher.finish());
+    let build_path = format!("{}/{}/", remote.temp_dir, hasher.finish());
 
     info!("Transferring sources to build server.");
     // transfer project to build server
@@ -126,7 +144,7 @@ fn main() {
         .arg("-a".to_owned())
         .arg("--delete")
         .arg("--compress")
-        .arg(format!("-e ssh -p {}", conf.remote.ssh_port))
+        .arg(format!("-e ssh -p {}", remote.ssh_port))
         .arg("--info=progress2")
         .arg("--exclude")
         .arg("target");
@@ -163,7 +181,7 @@ fn main() {
 
     info!("Starting build process.");
     let output = Command::new("ssh")
-        .arg(format!("-p {}", conf.remote.ssh_port))
+        .arg(format!("-p {}", remote.ssh_port))
         .arg("-t")
         .arg(&build_server)
         .arg(build_command)
@@ -183,7 +201,7 @@ fn main() {
             .arg("-a")
             .arg("--delete")
             .arg("--compress")
-            .arg(format!("-e ssh -p {}", conf.remote.ssh_port))
+            .arg(format!("-e ssh -p {}", remote.ssh_port))
             .arg("--info=progress2")
             .arg(format!(
                 "{}:{}/target/{}",
@@ -213,7 +231,7 @@ fn main() {
             .arg("-a")
             .arg("--delete")
             .arg("--compress")
-            .arg(format!("-e ssh -p {}", conf.remote.ssh_port))
+            .arg(format!("-e ssh -p {}", remote.ssh_port))
             .arg("--info=progress2")
             .arg(format!("{}:{}/Cargo.lock", build_server, build_path))
             .arg(format!("{}/Cargo.lock", project_dir.to_string_lossy()))
