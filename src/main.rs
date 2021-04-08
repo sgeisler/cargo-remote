@@ -27,6 +27,13 @@ pub struct RemoteOpts {
     /// The directory where cargo builds the project
     #[structopt(short, long = "remote-temp-dir")]
     temp_dir: Option<String>,
+
+    #[structopt(
+        short = "e",
+        long = "env",
+        help = "Environment profile. default_value = /etc/profile"
+    )]
+    env: Option<String>,
 }
 
 #[derive(StructOpt, Debug)]
@@ -52,14 +59,6 @@ enum Opts {
             default_value = "stable"
         )]
         rustup_default: String,
-
-        #[structopt(
-            short = "e",
-            long = "env",
-            help = "Environment profile. default_value = /etc/profile",
-            default_value = "/etc/profile"
-        )]
-        env: String,
 
         #[structopt(
             short = "c",
@@ -107,7 +106,6 @@ fn main() {
         remote_opts,
         build_env,
         rustup_default,
-        env,
         copy_back,
         no_copy_lock,
         manifest_path,
@@ -153,7 +151,8 @@ fn main() {
         .arg("-a".to_owned())
         .arg("--delete")
         .arg("--compress")
-        .args(&["-e", "ssh", "-p", &remote.ssh_port.to_string()])
+        .arg("-e")
+        .arg(format!("ssh -p {}", remote.ssh_port))
         .arg("--info=progress2")
         .arg("--exclude")
         .arg("target");
@@ -176,11 +175,11 @@ fn main() {
             exit(-4);
         });
     info!("Build ENV: {:?}", build_env);
-    info!("Environment profile: {:?}", env);
+    info!("Environment profile: {:?}", remote.env);
     info!("Build path: {:?}", build_path);
     let build_command = format!(
         "source {}; rustup default {}; cd {}; {} cargo {} {}",
-        env,
+        remote.env,
         rustup_default,
         build_path,
         build_env,
@@ -210,11 +209,12 @@ fn main() {
             .arg("-a")
             .arg("--delete")
             .arg("--compress")
-            .args(&["-e", "ssh", "-p", &remote.ssh_port.to_string()])
+            .arg("-e")
+            .arg(format!("ssh -p {}", remote.ssh_port))
             .arg("--info=progress2")
             .arg("--info=progress2")
             .arg(format!(
-                "{}:{}/target/{}",
+                "{}:{}target/{}",
                 build_server, build_path, file_name
             ))
             .arg(format!(
@@ -241,10 +241,11 @@ fn main() {
             .arg("-a")
             .arg("--delete")
             .arg("--compress")
-            .args(&["-e", "ssh", "-p", &remote.ssh_port.to_string()])
+            .arg("-e")
+            .arg(format!("ssh -p {}", remote.ssh_port))
             .arg("--info=progress2")
             .arg("--info=progress2")
-            .arg(format!("{}:{}/Cargo.lock", build_server, build_path))
+            .arg(format!("{}:{}Cargo.lock", build_server, build_path))
             .arg(format!("{}/Cargo.lock", project_dir.to_string_lossy()))
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
