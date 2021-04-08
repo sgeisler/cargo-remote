@@ -12,16 +12,20 @@ const PROGRESS_FLAG: &str = "--info=progress2";
 
 #[derive(StructOpt, Debug)]
 pub struct RemoteOpts {
-    #[structopt(short = "r", long = "remote", help = "Remote ssh build server")]
+    /// The name of the remote specified in the config
+    #[structopt(short = "r", long = "remote")]
     name: Option<String>,
 
-    #[structopt(short, long, help = "")]
+    /// Remote ssh build server with user or the name of the ssh entry
+    #[structopt(short = "H", long = "remote-host")]
     host: Option<String>,
 
-    #[structopt(short, long, help = "")]
+    /// The ssh port to communicate with the build server
+    #[structopt(short = "p", long = "remote-ssh-port")]
     ssh_port: Option<u16>,
 
-    #[structopt(short, long, help = "")]
+    /// The directory where cargo builds the project
+    #[structopt(short, long = "remote-temp-dir")]
     temp_dir: Option<String>,
 }
 
