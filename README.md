@@ -37,32 +37,42 @@ default remote build host and user. It can be overridden by the `-r` flag.
 
 Example config file:
 ```toml
-remote = "builds@myserver"
+[[remote]]
+name = "myRemote" # Not needed for a single remote
+host = "myUser@myServer" # Could also be a ssh config entry
+ssh_port = 42 # defaults to 22
+temp_dir = "~/rust" # Default is "~/remote-builds"
+env = "~/.profile" # Default is "/etc/profile"
 ```
 
 ### Flags and options
+
 ```
 USAGE:
     cargo remote [FLAGS] [OPTIONS] <command> [remote options]...
 
 FLAGS:
-    -c, --copy-back          Transfer the target folder back to the local machine
         --help               Prints help information
     -h, --transfer-hidden    Transfer hidden files and directories to the build server
+        --no-copy-lock       don't transfer the Cargo.lock file back to the local machine
     -V, --version            Prints version information
 
 OPTIONS:
     -b, --build-env <build_env>              Set remote environment variables. RUST_BACKTRACE, CC, LIB, etc.  [default:
                                              RUST_BACKTRACE=1]
-    -e, --env <env>                          Environment profile. default_value = /etc/profile [default: /etc/profile]
+    -c, --copy-back <copy_back>              Transfer the target folder or specific file from that folder back to the
+                                             local machine
+    -e, --env <env>                          Environment profile. default_value = /etc/profile
+    -H, --remote-host <host>                 Remote ssh build server with user or the name of the ssh entry
         --manifest-path <manifest_path>      Path to the manifest to execute [default: Cargo.toml]
-    -r, --remote <remote>                    Remote ssh build server
+    -r, --remote <name>                      The name of the remote specified in the config
     -d, --rustup-default <rustup_default>    Rustup default (stable|beta|nightly) [default: stable]
+    -p, --remote-ssh-port <ssh_port>         The ssh port to communicate with the build server
+    -t, --remote-temp-dir <temp_dir>         The directory where cargo builds the project
 
 ARGS:
     <command>              cargo command that will be executed remotely
     <remote options>...    cargo options and flags that will be applied remotely
-
 ```
 
 
