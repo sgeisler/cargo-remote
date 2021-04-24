@@ -4,11 +4,12 @@ description = "Cargo subcommand to build rust projects remotely"
 keywords = ["remote", "build"]
 categories = ["command-line-utilities", "development-tools::build-utils", "development-tools::cargo-plugins"]
 maintenance = { status = "experimental" }
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Sebastian Geisler <sgeisler@wh2.tu-dresden.de>"]
 license = "MIT"
 repository = "https://github.com/sgeisler/cargo-remote"
 edition = "2018"
+readme = "README.md"
 
 [dependencies]
 structopt = "0.2.18"
