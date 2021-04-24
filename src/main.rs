@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::{exit, Command, Stdio};
 use structopt::StructOpt;
 
-use log::{error, info, warn};
+use log::{error, info};
 
 mod config;
 
@@ -153,7 +153,7 @@ fn main() {
         .arg("--compress")
         .arg("-e")
         .arg(format!("ssh -p {}", remote.ssh_port))
-        .arg("--info=progress2")
+        .arg(PROGRESS_FLAG)
         .arg("--exclude")
         .arg("target");
 
@@ -211,8 +211,7 @@ fn main() {
             .arg("--compress")
             .arg("-e")
             .arg(format!("ssh -p {}", remote.ssh_port))
-            .arg("--info=progress2")
-            .arg("--info=progress2")
+            .arg(PROGRESS_FLAG)
             .arg(format!(
                 "{}:{}target/{}",
                 build_server, build_path, file_name
@@ -243,8 +242,7 @@ fn main() {
             .arg("--compress")
             .arg("-e")
             .arg(format!("ssh -p {}", remote.ssh_port))
-            .arg("--info=progress2")
-            .arg("--info=progress2")
+            .arg(PROGRESS_FLAG)
             .arg(format!("{}:{}Cargo.lock", build_server, build_path))
             .arg(format!("{}/Cargo.lock", project_dir.to_string_lossy()))
             .stdout(Stdio::inherit())
