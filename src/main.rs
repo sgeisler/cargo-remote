@@ -2,6 +2,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::process::{exit, Command, Stdio};
+use std::fs::canonicalize;
 use structopt::StructOpt;
 
 use log::{error, info};
@@ -128,7 +129,8 @@ fn main() {
     let project_metadata = metadata_cmd.exec().unwrap();
 
     let project_dir = match working_directory {
-        Some(path) => PathBuf::from(path),
+        Some(path) => canonicalize(PathBuf::from(path))
+            .expect("The provided working directory does not exist or has an error."),
         None => project_metadata.workspace_root.clone()
     };
     info!("Workspace root: {:?}", project_metadata.workspace_root.clone());
