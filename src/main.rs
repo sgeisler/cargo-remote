@@ -92,6 +92,13 @@ enum Opts {
         command: String,
 
         #[structopt(
+            short = "w",
+            long = "working-directory",
+            help = "The working directory to copy files from. Default is your workspace root."
+        )]
+        working_directory: Option<String>,
+
+        #[structopt(
             help = "cargo options and flags that will be applied remotely",
             name = "remote options"
         )]
@@ -111,6 +118,7 @@ fn main() {
         manifest_path,
         hidden,
         command,
+        working_directory,
         options,
     } = Opts::from_args();
 
@@ -118,8 +126,19 @@ fn main() {
     metadata_cmd.manifest_path(manifest_path).no_deps();
 
     let project_metadata = metadata_cmd.exec().unwrap();
-    let project_dir = project_metadata.workspace_root;
+
+    let project_dir = match working_directory {
+        Some(path) => PathBuf::from(path),
+        None => project_metadata.workspace_root.clone()
+    };
+    info!("Workspace root: {:?}", project_metadata.workspace_root.clone());
     info!("Project dir: {:?}", project_dir);
+
+    let diff_from_workspace_root = PathBuf::
+        from(project_metadata.workspace_root.clone())
+        .strip_prefix(project_dir.clone())
+        .expect("Working directory should be an ancestor of the workspace root")
+        .to_owned();
 
     let conf = match config::Config::new(&project_dir) {
         Ok(conf) => conf,
@@ -142,7 +161,7 @@ fn main() {
     // generate a unique build path by using the hashed project dir as folder on the remote machine
     let mut hasher = DefaultHasher::new();
     project_dir.hash(&mut hasher);
-    let build_path = format!("{}/{}/", remote.temp_dir, hasher.finish());
+    let build_path = format!("{}/{}", remote.temp_dir, hasher.finish());
 
     info!("Transferring sources to build server.");
     // transfer project to build server
@@ -178,10 +197,11 @@ fn main() {
     info!("Environment profile: {:?}", remote.env);
     info!("Build path: {:?}", build_path);
     let build_command = format!(
-        "source {}; rustup default {}; cd {}; {} cargo {} {}",
+        "source {}; rustup default {}; cd {}/{}; {} cargo {} {}",
         remote.env,
         rustup_default,
         build_path,
+        diff_from_workspace_root.display(),
         build_env,
         command,
         options.join(" ")
@@ -213,12 +233,13 @@ fn main() {
             .arg(format!("ssh -p {}", remote.ssh_port))
             .arg(PROGRESS_FLAG)
             .arg(format!(
-                "{}:{}target/{}",
-                build_server, build_path, file_name
+                "{}:{}/{}/target/{}",
+                build_server, build_path, diff_from_workspace_root.display(), file_name
             ))
             .arg(format!(
-                "{}/target/{}",
+                "{}/{}/target/{}",
                 project_dir.to_string_lossy(),
+                diff_from_workspace_root.display(),
                 file_name
             ))
             .stdout(Stdio::inherit())
@@ -243,7 +264,7 @@ fn main() {
             .arg("-e")
             .arg(format!("ssh -p {}", remote.ssh_port))
             .arg(PROGRESS_FLAG)
-            .arg(format!("{}:{}Cargo.lock", build_server, build_path))
+            .arg(format!("{}:{}/{}/Cargo.lock", build_server, build_path, diff_from_workspace_root.display()))
             .arg(format!("{}/Cargo.lock", project_dir.to_string_lossy()))
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
