@@ -139,13 +139,11 @@ fn main() {
     );
     info!("Project root: {:?}", project_root);
 
-    let diff_from_project_root = canonicalize(
-        PathBuf::from(project_metadata.workspace_root.clone())
-            .strip_prefix(project_root.clone())
-            .expect("Working directory should be an ancestor of the workspace root")
-            .to_owned(),
-    )
-    .expect("The provided directory does not exist or has an error.");
+    let diff_from_project_root = project_metadata
+        .workspace_root
+        .strip_prefix(project_root.clone())
+        .expect("Working directory should be an ancestor of the workspace root")
+        .to_owned();
 
     let conf = match config::Config::new(&project_root) {
         Ok(conf) => conf,
@@ -172,11 +170,9 @@ fn main() {
 
     let mut build_workspace = PathBuf::from(build_path.clone());
     build_workspace.push(diff_from_project_root.clone());
-    let build_workspace = canonicalize(build_workspace).expect("Path should exist");
 
     let mut project_workspace = project_root.clone();
     project_workspace.push(diff_from_project_root);
-    let project_workspace = canonicalize(project_workspace).expect("Path should exist");
 
     info!("Transferring sources to build server.");
     // transfer project to build server
