@@ -69,6 +69,7 @@ OPTIONS:
     -d, --rustup-default <rustup_default>    Rustup default (stable|beta|nightly) [default: stable]
     -p, --remote-ssh-port <ssh_port>         The ssh port to communicate with the build server
     -t, --remote-temp-dir <temp_dir>         The directory where cargo builds the project
+    -w, --working-directory <local_dir>      The local directory to use as project root. Useful when there are local dependencies outside the workspace directory.
 
 ARGS:
     <command>              cargo command that will be executed remotely
