@@ -1,4 +1,5 @@
 use std::collections::hash_map::DefaultHasher;
+use std::fs::canonicalize;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::process::{exit, Command, Stdio};
@@ -92,6 +93,13 @@ enum Opts {
         command: String,
 
         #[structopt(
+            short = "w",
+            long = "working-directory",
+            help = "The working directory to copy files from. Default is your workspace root."
+        )]
+        working_directory: Option<String>,
+
+        #[structopt(
             help = "cargo options and flags that will be applied remotely",
             name = "remote options"
         )]
@@ -111,6 +119,7 @@ fn main() {
         manifest_path,
         hidden,
         command,
+        working_directory,
         options,
     } = Opts::from_args();
 
@@ -118,10 +127,25 @@ fn main() {
     metadata_cmd.manifest_path(manifest_path).no_deps();
 
     let project_metadata = metadata_cmd.exec().unwrap();
-    let project_dir = project_metadata.workspace_root;
-    info!("Project dir: {:?}", project_dir);
 
-    let conf = match config::Config::new(&project_dir) {
+    let project_root = match working_directory {
+        Some(path) => canonicalize(PathBuf::from(path))
+            .expect("The provided working directory does not exist or has an error."),
+        None => project_metadata.workspace_root.clone(),
+    };
+    info!(
+        "Workspace root: {:?}",
+        project_metadata.workspace_root.clone()
+    );
+    info!("Project root: {:?}", project_root);
+
+    let diff_from_project_root = project_metadata
+        .workspace_root
+        .strip_prefix(project_root.clone())
+        .expect("Working directory should be an ancestor of the workspace root")
+        .to_owned();
+
+    let conf = match config::Config::new(&project_root) {
         Ok(conf) => conf,
         Err(error) => {
             error!("{}", error);
@@ -141,8 +165,14 @@ fn main() {
 
     // generate a unique build path by using the hashed project dir as folder on the remote machine
     let mut hasher = DefaultHasher::new();
-    project_dir.hash(&mut hasher);
-    let build_path = format!("{}/{}/", remote.temp_dir, hasher.finish());
+    project_root.hash(&mut hasher);
+    let build_path = format!("{}/{}", remote.temp_dir, hasher.finish());
+
+    let mut build_workspace = PathBuf::from(build_path.clone());
+    build_workspace.push(diff_from_project_root.clone());
+
+    let mut project_workspace = project_root.clone();
+    project_workspace.push(diff_from_project_root);
 
     info!("Transferring sources to build server.");
     // transfer project to build server
@@ -164,7 +194,7 @@ fn main() {
     rsync_to
         .arg("--rsync-path")
         .arg("mkdir -p remote-builds && rsync")
-        .arg(format!("{}/", project_dir.to_string_lossy()))
+        .arg(format!("{}/", project_root.to_string_lossy()))
         .arg(format!("{}:{}", build_server, build_path))
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -181,7 +211,7 @@ fn main() {
         "source {}; rustup default {}; cd {}; {} cargo {} {}",
         remote.env,
         rustup_default,
-        build_path,
+        build_workspace.to_string_lossy(),
         build_env,
         command,
         options.join(" ")
@@ -213,12 +243,14 @@ fn main() {
             .arg(format!("ssh -p {}", remote.ssh_port))
             .arg(PROGRESS_FLAG)
             .arg(format!(
-                "{}:{}target/{}",
-                build_server, build_path, file_name
+                "{}:{}/target/{}",
+                build_server,
+                build_workspace.to_string_lossy(),
+                file_name
             ))
             .arg(format!(
                 "{}/target/{}",
-                project_dir.to_string_lossy(),
+                project_workspace.to_string_lossy(),
                 file_name
             ))
             .stdout(Stdio::inherit())
@@ -243,8 +275,15 @@ fn main() {
             .arg("-e")
             .arg(format!("ssh -p {}", remote.ssh_port))
             .arg(PROGRESS_FLAG)
-            .arg(format!("{}:{}Cargo.lock", build_server, build_path))
-            .arg(format!("{}/Cargo.lock", project_dir.to_string_lossy()))
+            .arg(format!(
+                "{}:{}/Cargo.lock",
+                build_server,
+                build_workspace.to_string_lossy()
+            ))
+            .arg(format!(
+                "{}/Cargo.lock",
+                project_workspace.to_string_lossy()
+            ))
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .stdin(Stdio::inherit())
